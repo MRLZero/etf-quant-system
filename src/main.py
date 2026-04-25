@@ -16,30 +16,52 @@ def dynamic_window(data, base_window):
 
 
 def analyze(symbol, base_window):
-    data = yf.download(symbol, period="1y")["Close"]
+    print(f"\n🔍 Fetching {symbol}")
 
-    window = dynamic_window(data, base_window)
+    data = yf.download(symbol, period="1y")
 
-    rolling_high = data.rolling(window).max()
+    if data.empty:
+        print(f"❌ {symbol} data empty")
+        return None
 
-    price = data.iloc[-1]
+    close = data["Close"]
+
+    # ===== 动态 window =====
+    returns = close.pct_change().dropna()
+    vol = returns.std() * np.sqrt(252)
+
+    if vol == 0 or np.isnan(vol):
+        window = base_window
+    else:
+        window = int(base_window * (0.2 / vol))
+        window = max(20, min(window, 120))
+
+    # ===== rolling high =====
+    rolling_high = close.rolling(window).max()
+
+    # ❗关键：全部取最后一个值
+    price = close.iloc[-1]
     high = rolling_high.iloc[-1]
+
+    if np.isnan(high) or high == 0:
+        print(f"❌ {symbol} invalid high")
+        return None
 
     dd = (price - high) / high
 
-    ma200 = data.rolling(200).mean().iloc[-1]
+    # ===== 趋势 =====
+    ma200 = close.rolling(200).mean().iloc[-1]
     uptrend = price > ma200
 
-    # scoring
-    score = 0
-    if uptrend:
-        score += 1
-    if dd <= -0.10:
-        score += 1
-    if dd <= -0.15:
-        score += 2
-    if dd <= -0.20:
-        score += 3
+    # ===== 状态（全部是标量）=====
+    if dd <= -0.20 and uptrend:
+        state = "DEEP"
+    elif dd <= -0.15 and uptrend:
+        state = "BUY"
+    elif dd <= -0.10 and uptrend:
+        state = "WATCH"
+    else:
+        state = "NO"
 
     return {
         "symbol": symbol,
@@ -47,8 +69,8 @@ def analyze(symbol, base_window):
         "high": high,
         "dd": dd,
         "window": window,
-        "score": score,
-        "trend": uptrend
+        "trend": uptrend,
+        "state": state
     }
 
 
