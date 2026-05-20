@@ -2,7 +2,7 @@ name: ETF Quant Scan
 
 on:
   schedule:
-    - cron: "0 23 * * 1-5"  # 每天 UTC 22:00（美股收盘后）
+#    - cron: "0 23 * * 1-5"  # 每天 UTC 22:00（美股收盘后）
   workflow_dispatch:
 
 jobs:
